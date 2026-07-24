@@ -70,7 +70,7 @@ revision_history:
 
 *[Draft paragraph]*
 
-Model comparisons on MPRA (Massively Parallel Reporter Assay) data are supposed to tell us which architectures best capture *cis*-regulatory grammar. In practice, the same model can rank first in one paper and last in another, even when both claim to use the same dataset. We introduce a standardized, preprocessed collection of 15 MPRA datasets built in the spirit of MNIST/MedMNIST — designed to remove this ambiguity, complete with reproducible baselines, per-dataset documentation, and tutorial notebooks.
+Model comparisons on MPRA (Massively Parallel Reporter Assay) data are supposed to tell us which architectures best capture cis-regulatory grammar — and how much data is actually needed to reach a given level of performance. In practice, conclusions drawn in one paper can silently contradict the very data they're built on: we show a case where a reported performance "plateau" on yeast MPRA data (~0.80 Pearson correlation) falls well short of the 0.96 correlation reported in the original study that produced the data. We introduce **MPRA-MNIST** — a standardized, preprocessed collection of 15 MPRA datasets built in the spirit of MNIST/MedMNIST — designed to remove this kind of ambiguity, complete with reproducible baselines, per-dataset documentation, and tutorial notebooks. 
 
 Using MPRA-MNIST, we validate MPRALegNet as a reproducible baseline that matches or exceeds prior reported results, then benchmark four architectures (MPRAnn, MPRALegNet, Malinois, PARM) across single- vs. multi-target training, dataset scale, and cross-dataset transferability. We find that architecture choice matters consistently and at every data scale, task formulation (single- vs. multi-target) mostly doesn't matter, and cross-dataset transferability is driven more by data quality and volume than by assay type — while performance scaling with dataset size does not saturate as uniformly as previously suggested.
 
@@ -85,17 +85,21 @@ Using MPRA-MNIST, we validate MPRALegNet as a reproducible baseline that matches
 
 *[Draft paragraph]*
 
-Before presenting our approach, it's worth dwelling on the problem that motivated it.
+Before presenting our approach, it's worth dwelling on an example of the underlying problem: cross-paper conclusions about MPRA data that don't hold up once you trace them back to their source.
 
-Consider a lentiviral MPRA dataset produced by Agarwal et al., where regulatory activity is measured by counting sequencing reads across barcoded reporter constructs. In the original paper, several models are benchmarked on this data, and Enformer comes out clearly ahead of the other two architectures tested.
+Consider a study that set out to answer a natural and useful question: how much training data, drawn from various MPRA experiments, is needed to reach a given level of predictive quality? The authors report learning curves — test correlation as a function of training sample size — for several types of regulatory elements (promoters, enhancers, splicing sites, 5' UTRs).
 
-Now consider a follow-up paper by Tang and Koo, which reuses this same data. Two things stand out immediately: one of the original datasets is simply missing from their evaluation, and the reported quality metrics for the shared datasets differ substantially from the original numbers. More strikingly, the *ranking* of models changes — Enformer, the best-performing model in the first paper, becomes the *worst* of the same three models in the second.
+[Figure: test Pearson correlation vs. training sample size (log scale), one curve per regulatory element type; highlight the curve corresponding to the yeast dataset]
 
-![A descriptive alt text](./Comparison_Slope.png)
+The curve we care about here is the one built on yeast MPRA data. In the paper, the authors report that performance on this dataset plateaus once training size reaches roughly 200,000 sequences, at a correlation of around **0.80**.
 
-> Why would the same model, allegedly evaluated on the same data, end up at opposite ends of the ranking in two different studies?
+The problem: the original study that produced this yeast dataset — the one the authors are reusing — reports a correlation of **0.96** on the very same data.
 
-The most likely explanation is a preprocessing or evaluation discrepancy somewhere in the pipeline — but the deeper issue is that, as things stand, **we cannot actually trust a cross-paper comparison of the same model on "the same" MPRA dataset**. Differences in preprocessing, train/test splits, sequence encoding, or evaluation protocol are usually undocumented in enough detail to reproduce, and this undermines the field's ability to draw conclusions about which architectures are genuinely better.
+> If the same data supports a correlation of 0.96 in the paper that generated it, what does a "plateau" at 0.80 in a follow-up study actually mean?
+
+The most plausible explanations are mundane rather than scientific: a step or discontinuity in how the learning curve was constructed, or a technical bug in the reuse pipeline — not a genuine data ceiling. And once again we're left with the same underlying issue as before: **the same MPRA data, reused across papers, is producing qualitatively different conclusions that don't reconcile with the original source** — this time not about which model ranks first, but about how much data is actually needed to reach a given level of performance, and where the performance ceiling really sits.
+
+This is precisely the kind of discrepancy that becomes invisible once a number is published and cited forward, and precisely the kind of discrepancy a standardized, traceable benchmark is meant to catch before it propagates.
 
 ---
 
@@ -119,8 +123,6 @@ Following this same paradigm — lowering the barrier to entry and making result
 As of this writing, the collection includes **15 datasets**.
 
 > **Why this matters** — Think of it the same way MNIST let a new researcher train their first digit classifier without worrying about how to parse raw pixel files: this collection lets a new MPRA researcher benchmark a new architecture against known baselines without re-implementing five different papers' preprocessing pipelines from scratch, each with their own undocumented quirks.
-
-
 
 ## Detailed description of the framework
 
@@ -179,6 +181,7 @@ The original MPRALegNet study tested two models: MPRALegNet itself — an adapta
 
 Here, we systematically compared MPRALegNet and MPRAnn across **all** datasets included in MPRA-MNIST.
 
+![A descriptive alt text](./scatter_final_another_scale.png)
 *[Figure 3A: scatter plot — x = MPRAnn Pearson r, y = MPRALegNet Pearson r, one point per cell type/experimental condition, averaged over five independent runs, dashed y=x line]*
 
 Each point represents the average Pearson correlation coefficient over five independent runs for a specific cell type or experimental condition within a dataset. Points above the dashed line favor MPRALegNet; points below favor MPRAnn.
@@ -194,6 +197,7 @@ In a more focused follow-up, we additionally benchmarked two more architectures:
 
 Because Malinois and PARM were originally designed for sequences of roughly 200–600 nt, we restricted this particular comparison to the subset of datasets with sequences of comparable length — including the dataset used in Malinois's own original study.
 
+![A descriptive alt text](./combined.png)
 *[Figure 3B–D: per-dataset panels for Agarwal 2025 (B), Gosai 2024 (C), and de Almeida 2022 (D). X-axis: cell line or promoter type per dataset (K562/HepG2/WTC11 for Agarwal; K562/HepG2/SK-N-SH for Gosai; developmental/housekeeping promoter for de Almeida). Y-axis: Pearson correlation between predicted and measured expression. Each dot = one of five independent runs, colored by model.]*
 
 Across five random seeds, **MPRALegNet consistently outperformed both Malinois and PARM** — and this advantage held even on Malinois's own original benchmark dataset, where Malinois might have been expected to have a home-field advantage.
@@ -212,6 +216,7 @@ Using MPRA-MNIST, we investigated two related questions: (1) does the performanc
 
 A natural objection to any architecture comparison: does the gap between models simply shrink as more training data becomes available? To answer this, we examined the relationship between dataset size and the performance difference between MPRALegNet and MPRAnn.
 
+![A descriptive alt text](./scatter_delta_all_obs_vs_train_data.png)
 *[Figure 4A: scatter plot — x = log10(number of sequences), y = ΔPCC (MPRALegNet − MPRAnn), one point per cell type/experimental replicate; positive values favor MPRALegNet]*
 
 **Surprisingly, the performance gain of MPRALegNet over MPRAnn does not depend on dataset size.** This is consistent with the idea that a properly designed architecture and training procedure can be advantageous across many different data regimes: on smaller datasets, a better architecture may help prevent overfitting while still capturing biologically meaningful patterns, while on larger datasets it may let the model learn subtler aspects of regulatory grammar.
@@ -222,6 +227,7 @@ A natural objection to any architecture comparison: does the gap between models 
 
 To dig deeper into scaling behavior itself, we analyzed how predictive performance depends on training set size for each regression-task dataset in MPRA-MNIST, progressively varying training set size and evaluating on the corresponding held-out test set (averaging over multiple test sets where more than one was associated with the same training dataset).
 
+![A descriptive alt text](./scaling_combined.png)
 *[Figure 4B: two panels — MPRALegNet (left) and MPRAnn (right); x-axis = log10(number of training samples), y-axis = Pearson correlation; one line per dataset]*
 
 As expected, predictive performance for both models generally increases with training set size, and in most cases follows an approximately linear relationship with the logarithm of training set size — consistent with scaling behavior observed elsewhere in machine learning.
@@ -238,6 +244,7 @@ Whether multi-target learning provides an advantage over single-target modelling
 
 We used MPRA-MNIST to compare single-target and multi-target formulations of MPRALegNet on the subset of datasets that support both settings.
 
+![A descriptive alt text](./Group%20123.png)
 *[Figure 5: scatter plot — x = single-target Pearson r, y = multi-target Pearson r, one point per cell type/condition per dataset, dashed y=x line]*
 
 **No consistent advantage of multi-target learning is observed when performance is aggregated across datasets.** Multi-target training does improve performance in some individual cases, but these gains are not systematic, and are insignificant overall.
@@ -255,7 +262,8 @@ We trained MPRALegNet separately on every K562 dataset in the collection, then e
 
 To make the matrix interpretable, we normalized each column by its diagonal value — that is, by the performance of the model trained *and* tested on the same dataset. This puts every diagonal cell at exactly 100%. A cell above 100% means the model trained on a *different* dataset predicts better on the test set than the model trained on the test set's own training split.
 
-*[Insert heatmap: rows = training dataset, columns = test dataset, values normalized to diagonal = 100%]*
+![A descriptive alt text](./output2.png)
+*[Heatmap: rows = training dataset, columns = test dataset, values normalized to diagonal = 100%]*
 
 ### What the heatmap reveals
 
@@ -284,7 +292,7 @@ More broadly, this points back to the motivating problem: differences in reporte
 
 ## Open questions
 
-*[Draft — adjust to your actual future directions]*
+*[Draft]*
 
 - Can transferability be predicted ahead of time from dataset metadata (size, assay type, cell type), rather than only measured post-hoc via a full pairwise heatmap?
 - How do these findings hold up for architectures beyond the four tested here (e.g. transformer-based or foundation-model encoders)?
@@ -303,8 +311,6 @@ Using such a standardized collection of 15 datasets, we find that architecture c
 
 ## Code
 
-*[Fill in once repository is public]*
-
 The standardized dataset collection, preprocessing pipelines, baseline model implementations, all code used to produce the analyses and figures in this post is available at: [repository link](#).
 
 ### Tutorial
@@ -315,9 +321,7 @@ The standardized dataset collection, preprocessing pipelines, baseline model imp
 
 ## Conclusion
 
-*[Draft — 3-5 bullet summary]*
-
-- Cross-paper MPRA model comparisons are currently unreliable, even when studies claim to use the same underlying data.
+- Conclusions drawn from reused MPRA data are not automatically trustworthy — even when the underlying data is nominally "the same," reported metrics (e.g. a learning-curve plateau) can silently contradict the original source study.
 - We built a standardized, MNIST-style collection of 15 preprocessed MPRA datasets to remove this ambiguity going forward.
 - Using this collection, we show that architecture choice (MPRALegNet, PARM > MPRAnn, Malinois) matters consistently across scale, that single- vs multi-task training makes little difference, and that cross-dataset transferability depends more on data volume/quality than assay type.
 
@@ -335,8 +339,8 @@ Analysis and experiments: [link](#)
 
 *[Fill in full citations]*
 
-1. Agarwal, V. et al. [Original lentiviral MPRA paper].
-2. Tang, Z. & Koo, P. [Follow-up paper reusing Agarwal MPRA data].
+1. [Study reporting the yeast MPRA learning-curve plateau — source of the motivating example].
+2. [Original yeast MPRA study reporting 0.96 Pearson correlation on the same data].
 3. LeCun, Y. et al. MNIST handwritten digit database.
 4. [MedMNIST citation].
 5. [MPRAnn citation].
